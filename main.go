@@ -1,4 +1,4 @@
-// main.go
+// main.go (clean, modular & optimal)
 package main
 
 import (
@@ -6,11 +6,10 @@ import (
 	"encoding/json"
 	"fmt"
 	"html/template"
-	"io/ioutil"
 	"log"
 	"net/http"
 	"os"
-	"strings"
+	"strconv"
 
 	"github.com/joho/godotenv"
 )
@@ -25,26 +24,24 @@ type Task struct {
 }
 
 var (
-	tmpl         = template.Must(template.ParseFiles("template.html"))
+	tmpl          *template.Template
 	apiGatewayURL string
 	listenPort    string
 )
 
 func init() {
-	err := godotenv.Load()
-	if err != nil {
-		log.Fatal("Error loading .env file")
-	}
+	_ = godotenv.Load()
 	apiGatewayURL = os.Getenv("API_GATEWAY_URL")
 	listenPort = os.Getenv("PORT")
 	if listenPort == "" {
 		listenPort = "8080"
 	}
+	tmpl = template.Must(template.ParseFiles("template.html"))
 }
 
 func main() {
 	http.HandleFunc("/", handleIndex)
-	http.HandleFunc("/add", handleAdd)
+	http.HandleFunc("/create", handleCreate)
 	http.HandleFunc("/update", handleUpdate)
 	http.HandleFunc("/delete", handleDelete)
 	fmt.Println("Server started at :" + listenPort)
@@ -58,56 +55,76 @@ func handleIndex(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	defer resp.Body.Close()
-	body, _ := ioutil.ReadAll(resp.Body)
 
 	var tasks []Task
-	json.Unmarshal(body, &tasks)
-
+	if err := json.NewDecoder(resp.Body).Decode(&tasks); err != nil {
+		http.Error(w, "Invalid task data", http.StatusInternalServerError)
+		return
+	}
 	tmpl.Execute(w, tasks)
 }
 
-func handleAdd(w http.ResponseWriter, r *http.Request) {
+func handleCreate(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		http.Redirect(w, r, "/", http.StatusSeeOther)
 		return
 	}
+	r.ParseForm()
 	task := Task{
 		Title:       r.FormValue("title"),
 		Description: r.FormValue("description"),
 		DueDate:     r.FormValue("due_date"),
 		Priority:    r.FormValue("priority"),
 	}
-	data, _ := json.Marshal(task)
-	http.Post(apiGatewayURL+"/tasks", "application/json", bytes.NewBuffer(data))
+	postJSON("/tasks", task)
 	http.Redirect(w, r, "/", http.StatusSeeOther)
 }
 
 func handleUpdate(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Redirect(w, r, "/", http.StatusSeeOther)
+		return
+	}
+	r.ParseForm()
 	id := r.FormValue("id")
 	task := Task{
-		ID:          stringToInt(id),
+		ID:          parseInt(id),
 		Title:       r.FormValue("title"),
 		Description: r.FormValue("description"),
 		DueDate:     r.FormValue("due_date"),
 		Priority:    r.FormValue("priority"),
 		Completed:   r.FormValue("completed") == "on",
 	}
-	data, _ := json.Marshal(task)
-	req, _ := http.NewRequest(http.MethodPut, apiGatewayURL+"/tasks/"+id, bytes.NewBuffer(data))
-	req.Header.Set("Content-Type", "application/json")
-	http.DefaultClient.Do(req)
+	putJSON("/tasks/"+id, task)
 	http.Redirect(w, r, "/", http.StatusSeeOther)
 }
 
 func handleDelete(w http.ResponseWriter, r *http.Request) {
-	id := r.URL.Query().Get("id")
+	if r.Method != http.MethodPost {
+		http.Redirect(w, r, "/", http.StatusSeeOther)
+		return
+	}
+	id := r.FormValue("id")
 	req, _ := http.NewRequest(http.MethodDelete, apiGatewayURL+"/tasks/"+id, nil)
 	http.DefaultClient.Do(req)
 	http.Redirect(w, r, "/", http.StatusSeeOther)
 }
 
-func stringToInt(s string) int {
-	i := 0
-	fmt.Sscanf(s, "%d", &i)
-	return i
+func postJSON(path string, data any) {
+	buf := new(bytes.Buffer)
+	_ = json.NewEncoder(buf).Encode(data)
+	http.Post(apiGatewayURL+path, "application/json", buf)
+}
+
+func putJSON(path string, data any) {
+	buf := new(bytes.Buffer)
+	_ = json.NewEncoder(buf).Encode(data)
+	req, _ := http.NewRequest(http.MethodPut, apiGatewayURL+path, buf)
+	req.Header.Set("Content-Type", "application/json")
+	http.DefaultClient.Do(req)
+}
+
+func parseInt(s string) int {
+	n, _ := strconv.Atoi(s)
+	return n
 }
