@@ -1,7 +1,7 @@
 # Aplikasi CRUD sederhana dengan golang
 
 ## Arsitektur
-![Diagram CRUD](https://github.com/dihkaw/crud-3/blob/main/crud-3.drawio.png?raw=true)
+<img src="https://github.com/dihkaw/crud-3/blob/main/crud-3.drawio.png?raw=true" width="40%" alt="Diagram CRUD">
 
 ## .env Front end
 ```
