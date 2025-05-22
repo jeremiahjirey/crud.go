@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>To-Do List</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    body {
+      background: linear-gradient(-45deg, #ff9a9e, #fad0c4, #fad0c4, #fbc2eb);
+      background-size: 400% 400%;
+      animation: gradient 15s ease infinite;
+    }
+    @keyframes gradient {
+      0% { background-position: 0% 50%; }
+      50% { background-position: 100% 50%; }
+      100% { background-position: 0% 50%; }
+    }
+  </style>
+</head>
+<body class="text-gray-800 p-6">
+  <div class="max-w-4xl mx-auto bg-white rounded-2xl shadow-xl p-6">
+    <h1 class="text-3xl font-bold mb-4 text-center">📋 To-Do List</h1>
+    
+    <form action="/create" method="POST" class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+      <input name="title" placeholder="Judul" required class="p-2 border rounded" />
+      <input name="due_date" placeholder="Tanggal Jatuh Tempo (YYYY-MM-DD)" class="p-2 border rounded" />
+      <input name="priority" placeholder="Prioritas (Low/Medium/High)" class="p-2 border rounded" />
+      <input name="description" placeholder="Deskripsi" class="p-2 border rounded col-span-1 md:col-span-2" />
+      <button type="submit" class="bg-blue-600 text-white py-2 rounded col-span-1 md:col-span-2 hover:bg-blue-700">Tambah Tugas</button>
+    </form>
+
+    <table class="table-auto w-full text-sm">
+      <thead>
+        <tr class="bg-gray-200 text-left">
+          <th class="p-2">Judul</th>
+          <th class="p-2">Deskripsi</th>
+          <th class="p-2">Jatuh Tempo</th>
+          <th class="p-2">Prioritas</th>
+          <th class="p-2">Status</th>
+          <th class="p-2">Aksi</th>
+        </tr>
+      </thead>
+      <tbody>
+        {{range .}}
+        <tr class="border-t">
+          <td class="p-2">{{.Title}}</td>
+          <td class="p-2">{{.Description}}</td>
+          <td class="p-2">{{.DueDate}}</td>
+          <td class="p-2">{{.Priority}}</td>
+          <td class="p-2">{{if .Completed}}✅{{else}}❌{{end}}</td>
+          <td class="p-2">
+            <form action="/update" method="POST" class="inline">
+              <input type="hidden" name="id" value="{{.ID}}" />
+              <input type="hidden" name="title" value="{{.Title}}" />
+              <input type="hidden" name="description" value="{{.Description}}" />
+              <input type="hidden" name="due_date" value="{{.DueDate}}" />
+              <input type="hidden" name="priority" value="{{.Priority}}" />
+              <input type="hidden" name="completed" value="{{not .Completed}}" />
+              <button class="text-green-600 hover:underline" type="submit">Toggle ✅</button>
+            </form>
+            <form action="/delete" method="POST" class="inline ml-2">
+              <input type="hidden" name="id" value="{{.ID}}" />
+              <button class="text-red-600 hover:underline" type="submit">Hapus</button>
+            </form>
+          </td>
+        </tr>
+        {{end}}
+      </tbody>
+    </table>
+  </div>
+</body>
+</html>
