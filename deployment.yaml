@@ -1,0 +1,77 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: go-eks
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: go-app
+  template:
+    metadata:
+      labels:
+        app: go-app
+    spec:
+      containers:
+        - name: go
+          image: 778876534404.dkr.ecr.us-east-1.amazonaws.com/goecr25:go-image
+          ports:
+            - containerPort: 8080
+          env:
+            - name: DB_USER
+              valueFrom:
+                secretKeyRef:
+                  name: pod-secret
+                  key: DB_USER
+
+            - name: DB_PASS
+              valueFrom:
+                secretKeyRef:
+                  name: pod-secret
+                  key: DB_PASS
+
+            - name: DB_HOST
+              valueFrom:
+                secretKeyRef:
+                  name: pod-secret
+                  key: DB_HOST
+
+            - name: DB_PORT
+              valueFrom:
+                secretKeyRef:
+                  name: pod-secret
+                  key: DB_PORT
+
+            - name: DB_NAME
+              valueFrom:
+                secretKeyRef:
+                  name: pod-secret
+                  key: DB_NAME
+
+            - name: API_GATEWAY_URL
+              valueFrom:
+                secretKeyRef:
+                  name: pod-secret
+                  key: API_GATEWAY_URL
+              
+            - name: PORT
+              valueFrom:
+                secretKeyRef:
+                  name: pod-secret
+                  key: PORT
+            
+
+                  
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: go-app-service
+spec:
+  selector:
+    app: go-app
+  ports:
+    - protocol: TCP
+      port: 80
+      targetPort: 8080
+  type: LoadBalancer

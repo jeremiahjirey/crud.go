@@ -1,0 +1,136 @@
+name: Build GoLang App
+ 
+#on:
+#  workflow_run:
+#    workflows:
+#      - Terraform Apply
+#    types:
+#      - completed
+#jobs:
+#   install:
+#    runs-on: ubuntu-latest
+on:
+   push:
+     branches:
+       - main 
+     paths:
+        - .github/workflows/deployapp.yaml
+        - deployment.yaml
+        - Dockerfile
+
+jobs:
+   install:
+     runs-on: ubuntu-latest
+     steps:
+       - name: Checkout code
+         uses: actions/checkout@v3
+
+       - name: Set up Go
+         uses: actions/setup-go@v4
+         with:
+          go-version: 1.20
+ 
+       #- name: Set up Python
+       #  uses: actions/setup-python@v4
+       #  with:
+       #    python-version: 3.13
+ 
+       #- name: Install dependencies
+       #  run: |
+       #    python -m pip install --upgrade pip
+       #    pip install -r requirements.txt
+ 
+   build_and_push_ecr:
+     needs: install
+     runs-on: ubuntu-latest
+ 
+     steps:
+       - name: Checkout code
+         uses: actions/checkout@v3
+ 
+       - name: Configure AWS credentials
+         uses: aws-actions/configure-aws-credentials@v4
+         with:
+           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+           aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
+           aws-region: ${{ secrets.AWS_REGION }}
+ 
+       - name: Login to Amazon ECR
+         id: login-ecr
+         uses: aws-actions/amazon-ecr-login@v2
+ 
+       - name: Build, Tag, and Push Docker image to ECR
+         env:
+           ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+           ECR_REPOSITORY: ${{ secrets.ECR_REPOSITORY }}
+           IMAGE_TAG: go-image
+         run: |
+           docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG .
+           docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
+ 
+ 
+   deploy_to_eks:
+     needs:  build_and_push_ecr
+     runs-on: ubuntu-latest
+ 
+     steps:
+       - name: Checkout code
+         uses: actions/checkout@v3
+ 
+       - name: Configure AWS credentials
+         uses: aws-actions/configure-aws-credentials@v4
+         with:
+           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+           aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
+           aws-region: ${{ secrets.AWS_REGION }}
+ 
+       - name: Install kubectl
+         run: |
+           curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
+           chmod +x kubectl
+           sudo mv kubectl /usr/local/bin/
+ 
+       - name: Configure kubectl
+         run: |
+           aws eks update-kubeconfig --region ${{ secrets.AWS_REGION }} --name ${{ secrets.EKS_CLUSTER_NAME }}
+      
+       - name: Checking Node
+         run: kubectl get node -A
+
+        
+       #- name: Delete Old Secrett
+       #  run: kubectl delete secret pod-secret
+
+       - name: Create Secret
+         run: |
+            kubectl create secret generic pod-secret \
+            --from-literal=DB_USER=${{ secrets.DB_USER }} \
+            --from-literal=DB_PASS=${{ secrets.DB_PASS }} \
+            --from-literal=DB_HOST=${{ secrets.DB_HOST }} \
+            --from-literal=DB_PORT=${{ secrets.DB_PORT }} \
+            --from-literal=DB_NAME=${{ secrets.DB_NAME }} \
+            --from-literal=API_GATEWAY_URL=${{ secrets.API_GATEWAY_URL }} \
+            --from-literal=PORT=${{ secrets.PORT }} \
+           # --from-literal=AWS_SECRET_ACCESS_KEY=${{ secrets.AWS_SECRET_ACCESS_KEY }} \
+           # --from-literal=AWS_SESSION_TOKEN=${{ secrets.AWS_SESSION_TOKEN }}
+                  
+
+
+       #- name: Delete Old Deployment
+       #  run:  |
+       #   kubectl delete deployment flask
+       #   kubectl delete svc flask-app-service 
+          
+       - name: Deploy to EKS
+         env:
+           ECR_REGISTRY: ${{ secrets.ECR_REGISTRY }}
+           ECR_REPOSITORY: ${{ secrets.ECR_REPOSITORY }}
+           IMAGE_TAG: ${{ github.sha }}
+         run: |
+           envsubst < deployment.yaml | kubectl apply -f -
+
+           
+       - name: Verify   Deployment
+         run: kubectl get pods
