@@ -3,3 +3,7 @@ terraform/.env
 terraform/.terraform.lock.hcl
 terraform/.terraform/*
 crud-3.drawio.png
+go.mod
+go.sum
+lambda/layer.zip
+lambda/python/python-layer.zip
