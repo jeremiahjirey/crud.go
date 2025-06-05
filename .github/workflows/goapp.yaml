@@ -100,8 +100,8 @@ jobs:
          run: kubectl get node -A
 
         
-       #- name: Delete Old Secrett
-       #  run: kubectl delete secret pod-secret
+       - name: Delete Old Secrett
+         run: kubectl delete secret pod-secret
 
        - name: Create Secret
          run: |
