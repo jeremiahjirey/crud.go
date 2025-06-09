@@ -54,11 +54,6 @@ spec:
                   name: pod-secret
                   key: API_GATEWAY_URL
               
-            - name: PORT
-              valueFrom:
-                secretKeyRef:
-                  name: pod-secret
-                  key: PORT
             
 
                   

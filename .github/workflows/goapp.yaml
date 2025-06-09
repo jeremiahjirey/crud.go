@@ -112,7 +112,6 @@ jobs:
             --from-literal=DB_PORT=${{ secrets.DB_PORT }} \
             --from-literal=DB_NAME=${{ secrets.DB_NAME }} \
             --from-literal=API_GATEWAY_URL=${{ secrets.API_GATEWAY_URL }} \
-            --from-literal=PORT=${{ secrets.PORT }} \
            # --from-literal=AWS_SECRET_ACCESS_KEY=${{ secrets.AWS_SECRET_ACCESS_KEY }} \
            # --from-literal=AWS_SESSION_TOKEN=${{ secrets.AWS_SESSION_TOKEN }}
                   
