@@ -14,7 +14,7 @@ spec:
     spec:
       containers:
         - name: go
-          image: 778876534404.dkr.ecr.us-east-1.amazonaws.com/goecr25:go-image
+          image: 778876534404.dkr.ecr.us-east-1.amazonaws.com/goecr25:go-image2
           ports:
             - containerPort: 8080
           env:
