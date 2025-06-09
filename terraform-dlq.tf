@@ -176,6 +176,95 @@ resource "aws_db_subnet_group" "private" {
   }
 }
 
+resource "aws_rds_cluster" "aurora_cluster" {
+  cluster_identifier      = "go-aurora"
+  engine                  = "aurora-mysql"
+  engine_version          = ""
+  database_name           = "todoapp"
+  master_username         = "admin"
+  master_password         = "godatabase"
+  backup_retention_period = 7
+  preferred_backup_window = "07:00-09:00"
+  vpc_security_group_ids  = [aws_security_group.go_sg_app.id]
+  db_subnet_group_name    = aws_db_subnet_group.private.name
+}
+
+resource "aws_rds_cluster_instance" "cluster_instances1" {
+  count              = 2
+  identifier         = "go-cluster-instance-${count.index}"
+  cluster_identifier = aws_rds_cluster.aurora_cluster.id
+  instance_class     = "db.t3.medium"
+  engine             = aws_rds_cluster.aurora_cluster.engine
+  engine_version     = aws_rds_cluster.aurora_cluster.engine_version
+  publicly_accessible = false
+}
+
+
+resource "aws_eks_cluster" "cluster" {
+  name = "clusterGo2"
+
+  access_config {
+    authentication_mode = "API" 
+  }
+
+  role_arn = "arn:aws:iam::778876534404:role/LabRole"
+  version  = "1.32"
+
+  vpc_config {
+    subnet_ids = [aws_subnet.go_public_a.id,aws_subnet.go_public_b.id,]
+    security_group_ids = [aws_security_group.go_sg_app.id]
+    endpoint_public_access = true
+  } 
+}
+
+resource "aws_eks_addon" "addson1" {
+  cluster_name = aws_eks_cluster.cluster.name
+  addon_name   = "vpc-cni"
+}
+
+resource "aws_eks_addon" "addson2" {
+  cluster_name = aws_eks_cluster.cluster.name
+  addon_name   = "coredns" 
+}
+resource "aws_eks_addon" "addson3" {
+  cluster_name = aws_eks_cluster.cluster.name
+  addon_name   = "kube-proxy" 
+}
+resource "aws_eks_addon" "addson4" {
+  cluster_name = aws_eks_cluster.cluster.name
+  addon_name   = "eks-pod-identity-agent" 
+}
+resource "aws_eks_addon" "addson5" {
+  cluster_name = aws_eks_cluster.cluster.name
+  addon_name   = "node-monitoring-agent" 
+}
+resource "aws_eks_addon" "addson6" {
+  cluster_name = aws_eks_cluster.cluster.name
+  addon_name   = "external-dns" 
+}
+
+resource "aws_eks_node_group" "go-node" {
+  cluster_name    = aws_eks_cluster.cluster.name
+  node_group_name = "go-worker"
+  node_role_arn   = "arn:aws:iam::778876534404:role/LabRole"
+  subnet_ids = [aws_subnet.go_public_a.id,aws_subnet.go_public_b.id]
+
+  scaling_config {
+    desired_size = 2
+    max_size     = 2
+    min_size     = 2
+  }
+  capacity_type = "ON_DEMAND"
+  ami_type = "AL2023_x86_64_STANDARD"
+  instance_types = ["t3.medium"]
+
+  update_config {
+    max_unavailable = 1
+  }
+}
+
+
+
 
 # Ambil IAM Role yang sudah ada
 data "aws_iam_role" "existing_lab_role" {
@@ -201,37 +290,28 @@ resource "aws_lambda_function" "lambda" {
 
      environment {
     variables = {
-      DB_HOST = "tasks-db-instance-1.civylf1xnj0e.us-east-1.rds.amazonaws.com"
-      DB_USER = "admin"
-      DB_PASSWORD = "ambatukam"
-      DB_NAME = "todoapp"
-      DB_PORT = "3306"
+      DB_HOST = "dummy"
+      DB_USER = "dummy"
+      DB_PASSWORD = "dummy"
+      DB_NAME = "dummy"
+      DB_PORT = "dummy"
     } 
   }
 }
 
 resource "aws_api_gateway_rest_api" "api" {
     name = "go-api"
-endpoint_configuration {
-    types = ["REGIONAL"]
-  }
 }
 
-resource "aws_api_gateway_resource" "resource_task" {
-    path_part   = "tasks"
+resource "aws_api_gateway_resource" "resource" {
+    path_part   = "task"
     parent_id   = aws_api_gateway_rest_api.api.root_resource_id
     rest_api_id = aws_api_gateway_rest_api.api.id
 }
 
-resource "aws_api_gateway_resource" "resource_id" {
-  path_part   = "{id}"
-  parent_id   = aws_api_gateway_resource.resource_task.id
-  rest_api_id = aws_api_gateway_rest_api.api.id
-}
-
 resource "aws_api_gateway_method" "post_method" {
     rest_api_id   = aws_api_gateway_rest_api.api.id
-    resource_id   = aws_api_gateway_resource.resource_task.id
+    resource_id   = aws_api_gateway_resource.resource.id
     http_method   = "POST"
     authorization = "NONE"
 }
@@ -239,7 +319,7 @@ resource "aws_api_gateway_method" "post_method" {
 
 resource "aws_api_gateway_integration" "get_integration" {
     rest_api_id             = aws_api_gateway_rest_api.api.id
-    resource_id             = aws_api_gateway_resource.resource_task.id
+    resource_id             = aws_api_gateway_resource.resource.id
     http_method             = aws_api_gateway_method.post_method.http_method
     integration_http_method = "POST"
     type                    = "AWS_PROXY"
@@ -257,7 +337,7 @@ resource "aws_lambda_permission" "get_premission" {
 
 resource "aws_api_gateway_method" "get_method" {
     rest_api_id   = aws_api_gateway_rest_api.api.id
-    resource_id   = aws_api_gateway_resource.resource_task.id
+    resource_id   = aws_api_gateway_resource.resource.id
     http_method   = "GET"
     authorization = "NONE"
 }
@@ -265,7 +345,7 @@ resource "aws_api_gateway_method" "get_method" {
 
 resource "aws_api_gateway_integration" "get_integration_2" {
     rest_api_id             = aws_api_gateway_rest_api.api.id
-    resource_id             = aws_api_gateway_resource.resource_task.id
+    resource_id             = aws_api_gateway_resource.resource.id
     http_method             = aws_api_gateway_method.get_method.http_method
     integration_http_method = "POST"
     type                    = "AWS_PROXY"
@@ -275,15 +355,15 @@ resource "aws_api_gateway_integration" "get_integration_2" {
 
 resource "aws_api_gateway_method" "put_method" {
     rest_api_id   = aws_api_gateway_rest_api.api.id
-    resource_id   = aws_api_gateway_resource.resource_id.id
-    http_method   = "PUT"
+    resource_id   = aws_api_gateway_resource.resource.id
+    http_method   = "GET"
     authorization = "NONE"
 }
 
 
 resource "aws_api_gateway_integration" "get_integration_3" {
     rest_api_id             = aws_api_gateway_rest_api.api.id
-    resource_id             = aws_api_gateway_resource.resource_id.id
+    resource_id             = aws_api_gateway_resource.resource.id
     http_method             = aws_api_gateway_method.put_method.http_method
     integration_http_method = "POST"
     type                    = "AWS_PROXY"
@@ -293,53 +373,18 @@ resource "aws_api_gateway_integration" "get_integration_3" {
 
 resource "aws_api_gateway_method" "delete_method" {
     rest_api_id   = aws_api_gateway_rest_api.api.id
-    resource_id   = aws_api_gateway_resource.resource_id.id
-    http_method   = "DELETE"
+    resource_id   = aws_api_gateway_resource.resource.id
+    http_method   = "GET"
     authorization = "NONE"
 }
 
 
 resource "aws_api_gateway_integration" "get_integration_4" {
     rest_api_id             = aws_api_gateway_rest_api.api.id
-    resource_id             = aws_api_gateway_resource.resource_id.id
+    resource_id             = aws_api_gateway_resource.resource.id
     http_method             = aws_api_gateway_method.delete_method.http_method
     integration_http_method = "POST"
     type                    = "AWS_PROXY"
     uri                     = aws_lambda_function.lambda.invoke_arn
-}
-
-resource "aws_api_gateway_method" "get_method_id" {
-    rest_api_id   = aws_api_gateway_rest_api.api.id
-    resource_id   = aws_api_gateway_resource.resource_id.id
-    http_method   = "GET"
-    authorization = "NONE"
-}
-
-
-resource "aws_api_gateway_integration" "get_integration_5" {
-    rest_api_id             = aws_api_gateway_rest_api.api.id
-    resource_id             = aws_api_gateway_resource.resource_id.id
-    http_method             = aws_api_gateway_method.get_method_id.http_method
-    integration_http_method = "POST"
-    type                    = "AWS_PROXY"
-    uri                     = aws_lambda_function.lambda.invoke_arn
-}
-
-resource "aws_api_gateway_deployment" "deploy" {
-  rest_api_id = aws_api_gateway_rest_api.api.id
-
-  triggers = {
-    redeployment = sha1(jsonencode(aws_api_gateway_rest_api.api.body))
-  }
-
-  lifecycle {
-    create_before_destroy = true
-  }
-}
-
-resource "aws_api_gateway_stage" "prod_stage" {
-  deployment_id = aws_api_gateway_deployment.deploy.id
-  rest_api_id   = aws_api_gateway_rest_api.api.id
-  stage_name    = "prod"
 }
 
