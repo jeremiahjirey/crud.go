@@ -100,8 +100,8 @@ jobs:
          run: kubectl get node -A
 
         
-       - name: Delete Old Secrett
-         run: kubectl delete secret pod-secret
+       #- name: Delete Old Secrett
+       #  run: kubectl delete secret pod-secret
 
        - name: Create Secret
          run: |
@@ -118,10 +118,10 @@ jobs:
                   
 
 
-       - name: Delete Old Deployment
-         run:  |
-          kubectl delete deployment go-eks
-           kubectl delete svc go-app-service
+       #- name: Delete Old Deployment
+       #  run:  |
+       #   kubectl delete deployment go-eks
+       #  kubectl delete svc go-app-service
 
           
        - name: Deploy to EKS
