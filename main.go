@@ -43,11 +43,17 @@ func init() {
 
 func main() {
 	http.HandleFunc("/", handleIndex)
+	http.HandleFunc("/healthz", handleHealthz) // ✅ health check endpoint
 	http.HandleFunc("/create", handleCreate)
 	http.HandleFunc("/update", handleUpdate)
 	http.HandleFunc("/delete", handleDelete)
 	fmt.Println("Server listening on :" + listenPort)
 	http.ListenAndServe(":"+listenPort, nil)
+}
+
+func handleHealthz(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusOK)
+	w.Write([]byte("OK"))
 }
 
 func handleIndex(w http.ResponseWriter, r *http.Request) {
